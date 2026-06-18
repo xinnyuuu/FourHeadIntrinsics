@@ -14,6 +14,23 @@ import numpy as np
 from fourhead_intrinsics.io import list_images, load_calibration, write_side_by_side
 
 
+FLOAT_COLUMNS = {
+    "rms_px",
+    "mean_view_px",
+    "median_view_px",
+    "max_view_px",
+    "fx",
+    "fy",
+    "cx",
+    "cy",
+    "k1",
+    "k2",
+    "p1",
+    "p2",
+    "k3",
+}
+
+
 def calibration_path(results_root: Path, camera: str, experiment: str, method: str) -> Path:
     return results_root / camera / experiment / method / "calibration.yaml"
 
@@ -84,7 +101,7 @@ def print_rows(rows: list[dict[str, object]]) -> None:
     writer = csv.DictWriter(sys.stdout, fieldnames=headers)
     writer.writeheader()
     for row in rows:
-        writer.writerow(row)
+        writer.writerow(format_row(row))
 
 
 def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
@@ -92,7 +109,23 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(format_row(row) for row in rows)
+
+
+def format_value(key: str, value: object) -> object:
+    if key not in FLOAT_COLUMNS:
+        return value
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return value
+    if np.isnan(number):
+        return ""
+    return f"{number:.6f}"
+
+
+def format_row(row: dict[str, object]) -> dict[str, object]:
+    return {key: format_value(key, value) for key, value in row.items()}
 
 
 def undistort_previews(

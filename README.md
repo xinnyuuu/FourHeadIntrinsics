@@ -362,6 +362,8 @@ python scripts/analyze_experiments.py \
 k1,k2,p1,p2,k3
 ```
 
+所有浮点参数会统一保留小数点后 6 位，终端输出和 `--csv` 文件一致。
+
 也可以指定实验并保存 CSV：
 
 ```bash
