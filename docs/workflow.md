@@ -7,8 +7,9 @@
 5. 用 `--experiment exp01`、`--experiment exp02` 等参数把不同实验存入不同目录。
 6. 先跑棋盘格标定，再视情况跑 ChArUco 交叉验证。
 7. 查看 `processed/rejected` 中被拒图片，必要时删除模糊、反光、误检图片后重跑。
-8. 用 `scripts/calibrate_rig.py` 导出 `data/results/four_camera_intrinsics.yaml`。
-9. 若 `quality_ledger` 中某路为 `review`，按原因补拍或放宽阈值后重新评估。
+8. 在 `README.md` 的“内参和畸变参数怎么算出来”章节中对比 `camera_matrix`、`dist_coeffs` 和重投影误差。
+9. 用 `scripts/calibrate_rig.py` 导出 `data/results/four_camera_intrinsics.yaml`。
+10. 若 `quality_ledger` 中某路为 `review`，按原因补拍或放宽阈值后重新评估。
 
 单路多次实验示例：
 
