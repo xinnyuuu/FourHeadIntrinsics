@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import cv2
 import numpy as np
 import yaml
 
@@ -44,3 +45,12 @@ def load_calibration(path: str | Path) -> dict[str, Any]:
     if "dist_coeffs" in data:
         data["dist_coeffs"] = np.array(data["dist_coeffs"], dtype=np.float64)
     return data
+
+
+def write_side_by_side(path: str | Path, left: np.ndarray, right: np.ndarray) -> None:
+    if left.shape[:2] != right.shape[:2]:
+        right = cv2.resize(right, (left.shape[1], left.shape[0]))
+    canvas = np.hstack([left, right])
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(out), canvas)

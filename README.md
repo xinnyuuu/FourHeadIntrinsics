@@ -103,22 +103,6 @@ a                  开关自动保存
 q / ESC            退出
 ```
 
-如果要自动每 2 秒保存，并且要求画面稳定：
-
-```bash
-python scripts/capture_camera.py \
-  --source /dev/video2 \
-  --camera left_side \
-  --experiment exp02 \
-  --width 640 \
-  --height 480 \
-  --fps 30 \
-  --fourcc YUYV \
-  --max-images 60 \
-  --require-still \
-  --interval 2
-```
-
 旧用法仍然可用。如果你显式传 `--output`，脚本会使用这个目录，而不是自动生成实验目录。
 
 ## 5. 标定某次实验
@@ -192,7 +176,7 @@ python scripts/calibrate_camera.py \
   --experiment exp02 \
   --cols 9 \
   --rows 6 \
-  --square-size 25.0 \
+  --square-size 22.0\
   --max-error 2.5 \
   --auto-filter
 ```
@@ -363,3 +347,57 @@ data/results/left_side/exp02/chessboard/calibration.yaml
 - `dist_coeffs`
 
 最终优先选 RMS 低、主点接近 `(320, 240)`、有效图数量充足、rejected 图原因可解释的一次实验。
+
+可以用脚本直接汇总某个相机的多次实验：
+
+```bash
+python scripts/analyze_experiments.py \
+  --camera left_side \
+  --method chessboard
+```
+
+输出是 CSV 风格表格，其中这些列就是畸变参数：
+
+```text
+k1,k2,p1,p2,k3
+```
+
+也可以指定实验并保存 CSV：
+
+```bash
+python scripts/analyze_experiments.py \
+  --camera left_side \
+  --method chessboard \
+  --experiments exp01 exp02 exp03 \
+  --csv data/analysis/left_side_chessboard_summary.csv
+```
+
+## 10. 去畸变分析
+
+生成原图 / 去畸变图并排对比：
+
+```bash
+python scripts/analyze_experiments.py \
+  --camera left_side \
+  --method chessboard \
+  --experiments exp02 \
+  --undistort \
+  --undistort-limit 8
+```
+
+输出目录：
+
+```text
+data/analysis/left_side/exp02/chessboard/undistort/
+```
+
+每张图左边是原图，右边是 `camera_matrix + dist_coeffs` 去畸变后的结果。右图绿色框是 OpenCV 估计的有效 ROI。
+
+去畸变图主要用来检查：
+
+- 画面边缘直线是否变直。
+- 去畸变后是否出现异常拉伸。
+- `dist_coeffs` 是否过度补偿。
+- 棋盘格边缘区域是否比原图更符合直线几何。
+
+如果去畸变后画面明显扭曲得更奇怪，通常说明这次实验的畸变参数不可靠，需要回头检查采集覆盖、棋盘格平整度和 RMS。
