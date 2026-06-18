@@ -23,11 +23,11 @@ FLOAT_COLUMNS = {
     "fy",
     "cx",
     "cy",
-    "k1",
-    "k2",
-    "p1",
-    "p2",
-    "k3",
+    "d1",
+    "d2",
+    "d3",
+    "d4",
+    "d5",
 }
 
 
@@ -60,6 +60,8 @@ def row_from_calibration(path: Path, experiment: str) -> dict[str, object]:
     return {
         "experiment": experiment,
         "method": calib.get("method", "?"),
+        "camera_model": calib.get("camera_model", "pinhole"),
+        "distortion_model": calib.get("distortion_model", "plumb_bob"),
         "valid_images": calib.get("valid_image_count", ""),
         "rms_px": calib.get("rms_reprojection_error_px", np.nan),
         "mean_view_px": summary.get("mean_px", np.nan),
@@ -69,11 +71,11 @@ def row_from_calibration(path: Path, experiment: str) -> dict[str, object]:
         "fy": float(matrix[1, 1]),
         "cx": float(matrix[0, 2]),
         "cy": float(matrix[1, 2]),
-        "k1": float(padded[0]),
-        "k2": float(padded[1]),
-        "p1": float(padded[2]),
-        "p2": float(padded[3]),
-        "k3": float(padded[4]),
+        "d1": float(padded[0]),
+        "d2": float(padded[1]),
+        "d3": float(padded[2]),
+        "d4": float(padded[3]),
+        "d5": float(padded[4]),
         "calibration": str(path),
     }
 
@@ -82,6 +84,8 @@ def print_rows(rows: list[dict[str, object]]) -> None:
     headers = [
         "experiment",
         "method",
+        "camera_model",
+        "distortion_model",
         "valid_images",
         "rms_px",
         "mean_view_px",
@@ -91,11 +95,11 @@ def print_rows(rows: list[dict[str, object]]) -> None:
         "fy",
         "cx",
         "cy",
-        "k1",
-        "k2",
-        "p1",
-        "p2",
-        "k3",
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5",
         "calibration",
     ]
     writer = csv.DictWriter(sys.stdout, fieldnames=headers)
@@ -138,6 +142,7 @@ def undistort_previews(
     calib = load_calibration(calibration)
     camera_matrix = calib["camera_matrix"]
     dist_coeffs = calib["dist_coeffs"]
+    camera_model = calib.get("camera_model", "pinhole")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     written = 0
@@ -148,11 +153,32 @@ def undistort_previews(
         if img is None:
             continue
         height, width = img.shape[:2]
-        new_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, (width, height), alpha, (width, height))
-        undistorted = cv2.undistort(img, camera_matrix, dist_coeffs, None, new_matrix)
-        x, y, roi_w, roi_h = roi
-        if roi_w > 0 and roi_h > 0:
-            cv2.rectangle(undistorted, (x, y), (x + roi_w, y + roi_h), (0, 255, 0), 1)
+        if camera_model == "fisheye":
+            balance = max(0.0, min(1.0, alpha))
+            new_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
+                camera_matrix,
+                dist_coeffs.reshape(-1, 1),
+                (width, height),
+                np.eye(3),
+                balance=balance,
+            )
+            map1, map2 = cv2.fisheye.initUndistortRectifyMap(
+                camera_matrix,
+                dist_coeffs.reshape(-1, 1),
+                np.eye(3),
+                new_matrix,
+                (width, height),
+                cv2.CV_16SC2,
+            )
+            undistorted = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        else:
+            new_matrix, roi = cv2.getOptimalNewCameraMatrix(
+                camera_matrix, dist_coeffs, (width, height), alpha, (width, height)
+            )
+            undistorted = cv2.undistort(img, camera_matrix, dist_coeffs, None, new_matrix)
+            x, y, roi_w, roi_h = roi
+            if roi_w > 0 and roi_h > 0:
+                cv2.rectangle(undistorted, (x, y), (x + roi_w, y + roi_h), (0, 255, 0), 1)
         write_side_by_side(output_dir / f"undistort_{path.name}", img, undistorted)
         written += 1
 

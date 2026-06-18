@@ -1,19 +1,19 @@
 # 四目头环相机配置。按实际 /dev/video* 或数字 index 修改 source。
 # 当前物理顺序：左侧、左前、右前、右侧。
 capture:
-  width: 640
-  height: 480
-  fps: 30
-  fourcc: YUYV
+  width: 1600
+  height: 1200
+  fps: 25
+  fourcc: MJPG
 cameras:
   - key: left_side
     label: 左侧
     role: cam_left_side
-    source: /dev/video2
+    source: /dev/video0
   - key: left_front
     label: 左前
     role: cam_left_front
-    source: /dev/video0
+    source: /dev/video2
   - key: right_front
     label: 右前
     role: cam_right_front

@@ -30,7 +30,8 @@ class CalibrationOptions:
     processed_dir: Path
     debug_dir: Path
     square_size: float
-    max_error: float = 1.0
+    max_error: float = 5.0
+    camera_model: str = "fisheye"
     auto_filter: bool = True
     quality_filter: QualityFilter = QualityFilter()
 
@@ -67,6 +68,108 @@ def _prepare_dirs(options: CalibrationOptions) -> None:
     options.debug_dir.mkdir(parents=True, exist_ok=True)
     shutil.rmtree(options.processed_dir / "accepted", ignore_errors=True)
     shutil.rmtree(options.processed_dir / "rejected", ignore_errors=True)
+
+
+def _model_metadata(camera_model: str) -> dict[str, str]:
+    if camera_model == "fisheye":
+        return {
+            "camera_model": "fisheye",
+            "distortion_model": "opencv_fisheye",
+            "dist_coeffs_order": "k1,k2,k3,k4",
+        }
+    if camera_model == "pinhole":
+        return {
+            "camera_model": "pinhole",
+            "distortion_model": "plumb_bob",
+            "dist_coeffs_order": "k1,k2,p1,p2,k3",
+        }
+    raise ValueError(f"Unsupported camera model: {camera_model}")
+
+
+def _fisheye_object_points(points: list[np.ndarray]) -> list[np.ndarray]:
+    return [np.asarray(obj, dtype=np.float64).reshape(-1, 1, 3) for obj in points]
+
+
+def _fisheye_image_points(points: list[np.ndarray]) -> list[np.ndarray]:
+    return [np.asarray(img, dtype=np.float64).reshape(-1, 1, 2) for img in points]
+
+
+def _calibrate_model(
+    object_points: list[np.ndarray],
+    image_points: list[np.ndarray],
+    image_size: tuple[int, int],
+    camera_model: str,
+) -> tuple[float, np.ndarray, np.ndarray, list[np.ndarray], list[np.ndarray]]:
+    if camera_model == "fisheye":
+        camera_matrix = np.zeros((3, 3), dtype=np.float64)
+        dist_coeffs = np.zeros((4, 1), dtype=np.float64)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 200, 1e-6)
+        flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.fisheye.calibrate(
+            _fisheye_object_points(object_points),
+            _fisheye_image_points(image_points),
+            image_size,
+            camera_matrix,
+            dist_coeffs,
+            None,
+            None,
+            flags,
+            criteria,
+        )
+        return float(rms), camera_matrix, dist_coeffs, list(rvecs), list(tvecs)
+
+    if camera_model == "pinhole":
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
+            object_points,
+            image_points,
+            image_size,
+            None,
+            None,
+        )
+        return float(rms), camera_matrix, dist_coeffs, list(rvecs), list(tvecs)
+
+    raise ValueError(f"Unsupported camera model: {camera_model}")
+
+
+def _project_points(
+    object_points: np.ndarray,
+    rvec: np.ndarray,
+    tvec: np.ndarray,
+    camera_matrix: np.ndarray,
+    dist_coeffs: np.ndarray,
+    camera_model: str,
+) -> np.ndarray:
+    if camera_model == "fisheye":
+        projected, _ = cv2.fisheye.projectPoints(
+            np.asarray(object_points, dtype=np.float64).reshape(-1, 1, 3),
+            rvec,
+            tvec,
+            camera_matrix,
+            dist_coeffs,
+        )
+        return projected
+    projected, _ = cv2.projectPoints(object_points, rvec, tvec, camera_matrix, dist_coeffs)
+    return projected
+
+
+def _per_view_errors(
+    object_points: list[np.ndarray],
+    image_points: list[np.ndarray],
+    rvecs: list[np.ndarray],
+    tvecs: list[np.ndarray],
+    camera_matrix: np.ndarray,
+    dist_coeffs: np.ndarray,
+    camera_model: str,
+) -> list[float]:
+    if camera_model == "pinhole":
+        return per_view_reprojection_errors(object_points, image_points, rvecs, tvecs, camera_matrix, dist_coeffs)
+
+    errors = []
+    for obj, img, rvec, tvec in zip(object_points, image_points, rvecs, tvecs):
+        projected = _project_points(obj, rvec, tvec, camera_matrix, dist_coeffs, camera_model)
+        corners = np.asarray(img, dtype=np.float64).reshape(-1, 1, 2)
+        errors.append(float(cv2.norm(corners, projected, cv2.NORM_L2) / math.sqrt(len(projected))))
+    return errors
 
 
 def calibrate_chessboard(cols: int, rows: int, options: CalibrationOptions) -> dict[str, object]:
@@ -142,14 +245,21 @@ def calibrate_chessboard(cols: int, rows: int, options: CalibrationOptions) -> d
 
     rejected_by_error_images: list[str] = []
     while True:
-        rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = _calibrate_model(
             object_points,
             image_points,
             image_size,
-            None,
-            None,
+            options.camera_model,
         )
-        errors = per_view_reprojection_errors(object_points, image_points, rvecs, tvecs, camera_matrix, dist_coeffs)
+        errors = _per_view_errors(
+            object_points,
+            image_points,
+            rvecs,
+            tvecs,
+            camera_matrix,
+            dist_coeffs,
+            options.camera_model,
+        )
         high_error_indexes = [idx for idx, err in enumerate(errors) if err > options.max_error]
         for idx in high_error_indexes:
             if used_images[idx] not in rejected_by_error_images:
@@ -188,6 +298,7 @@ def calibrate_chessboard(cols: int, rows: int, options: CalibrationOptions) -> d
     summary = summarize_errors(errors)
     data = {
         "method": "chessboard",
+        **_model_metadata(options.camera_model),
         "image_size": list(image_size),
         "pattern": {"inner_cols": cols, "inner_rows": rows, "square_size": options.square_size},
         "valid_image_count": len(used_images),
@@ -329,17 +440,21 @@ def calibrate_charuco(cols: int, rows: int, marker_ratio: float, options: Calibr
 
     rejected_by_error_images: list[str] = []
     while True:
-        rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = _calibrate_model(
             all_object_points,
             all_corners,
             image_size,
-            None,
-            None,
+            options.camera_model,
         )
-        errors = []
-        for obj, corners, rvec, tvec in zip(all_object_points, all_corners, rvecs, tvecs):
-            projected, _ = cv2.projectPoints(obj, rvec, tvec, camera_matrix, dist_coeffs)
-            errors.append(float(cv2.norm(corners, projected, cv2.NORM_L2) / math.sqrt(len(projected))))
+        errors = _per_view_errors(
+            all_object_points,
+            all_corners,
+            rvecs,
+            tvecs,
+            camera_matrix,
+            dist_coeffs,
+            options.camera_model,
+        )
         high_error_indexes = [idx for idx, err in enumerate(errors) if err > options.max_error]
         for idx in high_error_indexes:
             if used_images[idx] not in rejected_by_error_images:
@@ -379,6 +494,7 @@ def calibrate_charuco(cols: int, rows: int, marker_ratio: float, options: Calibr
     summary = summarize_errors(errors)
     data = {
         "method": "charuco",
+        **_model_metadata(options.camera_model),
         "image_size": list(image_size),
         "pattern": {
             "squares_cols": cols,

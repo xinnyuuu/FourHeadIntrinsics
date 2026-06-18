@@ -105,38 +105,49 @@ def export_four_camera_yaml(
     output: str | Path,
     method_preference: str = "best_available",
     principal_tolerance_px: float = 20.0,
-    max_rms_px: float = 0.5,
-    max_per_view_px: float = 1.0,
+    max_rms_px: float = 5.0,
+    max_per_view_px: float = 10.0,
 ) -> dict[str, Any]:
     cameras: dict[str, Any] = {}
     ledger: dict[str, Any] = {}
     image_size: list[int] | None = None
+    distortion_models: set[str] = set()
+    camera_models: set[str] = set()
 
     for idx, (camera, path) in enumerate(zip(rig.cameras, calibration_paths)):
         result = load_calibration(path)
         result["camera_matrix"] = result["camera_matrix"].tolist()
         result["dist_coeffs"] = result["dist_coeffs"].reshape(-1).tolist()
         image_size = result["image_size"]
+        camera_model = str(result.get("camera_model", "pinhole"))
+        distortion_model = str(result.get("distortion_model", "plumb_bob"))
+        camera_models.add(camera_model)
+        distortion_models.add(distortion_model)
         key = camera_output_key(idx, camera)
         cameras[key] = {
             "label": camera.label,
             "role": camera.role,
             "source": camera.source,
             "method": result["method"],
+            "camera_model": camera_model,
+            "distortion_model": distortion_model,
             "camera_matrix": result["camera_matrix"],
-            "dist_coeffs": result["dist_coeffs"][:5],
+            "dist_coeffs": result["dist_coeffs"],
         }
         ledger[key] = {
             "calibration_file": str(path),
             "valid_image_count": result["valid_image_count"],
             "method": result["method"],
+            "camera_model": camera_model,
+            "distortion_model": distortion_model,
             **quality_status(result, principal_tolerance_px, max_rms_px, max_per_view_px),
         }
 
     data = {
         "setting": {
             "image_size": image_size or list(rig.image_size),
-            "distortion_model": "plumb_bob",
+            "camera_model": next(iter(camera_models)) if len(camera_models) == 1 else "mixed",
+            "distortion_model": next(iter(distortion_models)) if len(distortion_models) == 1 else "mixed",
             "method_preference": method_preference,
         },
         **cameras,

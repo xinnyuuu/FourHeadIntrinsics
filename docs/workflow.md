@@ -1,41 +1,96 @@
-# 四目头环内参测定流程
+# 四目头环标定简版流程
 
-1. 用 `scripts/list_cameras.py` 锁定四路 `/dev/video*`。
-2. 按物理顺序更新 `configs/four_head_rig.yaml`。
-3. 打印棋盘格或 ChArUco，量真实方格边长。
-4. 对每一路独立采图，确保标定板覆盖全画面和四角。
-5. 用 `--experiment exp01`、`--experiment exp02` 等参数把不同实验存入不同目录。
-6. 先跑棋盘格标定，再视情况跑 ChArUco 交叉验证。
-7. 查看 `processed/rejected` 中被拒图片，必要时删除模糊、反光、误检图片后重跑。
-8. 在 `README.md` 的“内参和畸变参数怎么算出来”章节中对比 `camera_matrix`、`dist_coeffs` 和重投影误差。
-9. 用 `scripts/analyze_experiments.py` 输出多次实验的 `[k1, k2, p1, p2, k3]`，必要时生成去畸变对比图。
-10. 用 `scripts/calibrate_rig.py` 导出 `data/results/four_camera_intrinsics.yaml`。
-11. 若 `quality_ledger` 中某路为 `review`，按原因补拍或放宽阈值后重新评估。
+详细计划见 [3dmotion_calibration_workflow.md](3dmotion_calibration_workflow.md)。这里保留最短操作入口，避免和详细文档重复。
 
-单路多次实验示例：
+## 1. 固定采集档位
+
+当前 3D Motion 原型主线：
+
+```text
+MJPG 1600x1200 @ 25fps
+```
+
+切换分辨率、裁剪比例或 ISP/dewarp 路径后必须重新标定。
+
+## 2. 首选 Kalibr 全向标定
+
+生成 AprilGrid target：
+
+```bash
+python scripts/generate_kalibr_aprilgrid.py \
+  --tag-cols 6 \
+  --tag-rows 6 \
+  --tag-size-m 0.088 \
+  --tag-spacing 0.3 \
+  --output data/targets/aprilgrid_6x6_088.yaml
+```
+
+采集 bag 后比较：
+
+```text
+ds-none
+eucm-none
+omni-radtan
+```
+
+把 Kalibr camchain 导入 3D Motion：
+
+```bash
+python scripts/import_kalibr_camchain_to_3dmotion.py \
+  --camchain data/kalibr/main_1600x1200_exp01/camchain.yaml \
+  --output ../3DMotion/configs/cameras.yaml \
+  --existing ../3DMotion/configs/cameras.yaml
+```
+
+## 3. OpenCV Fallback
+
+采集单路图像：
 
 ```bash
 python scripts/capture_camera.py \
-  --source /dev/video2 \
+  --source /dev/video0 \
   --camera left_side \
-  --experiment exp02 \
-  --interval 0
-
-python scripts/calibrate_camera.py \
-  --method chessboard \
-  --camera left_side \
-  --experiment exp02 \
-  --cols 9 \
-  --rows 6 \
-  --square-size 25.0 \
-  --max-error 1.0 \
-  --auto-filter
-
-python scripts/analyze_experiments.py \
-  --camera left_side \
-  --method chessboard \
-  --experiments exp02 \
-  --undistort
+  --experiment main_1600x1200_exp01 \
+  --max-images 100
 ```
 
-这个库只做每个独立相机的内参和畸变，不估计四路外参。外参应在固定头环刚体安装后，用多目共同可见标定板或 AprilTag/Charuco 板另行测定。
+ChArUco fallback 标定：
+
+```bash
+python scripts/calibrate_camera.py \
+  --method charuco \
+  --camera-model fisheye \
+  --camera left_side \
+  --experiment main_1600x1200_exp01 \
+  --cols 8 \
+  --rows 11 \
+  --square-size 22.0 \
+  --marker-ratio 0.72 \
+  --max-error 5.0 \
+  --auto-filter
+```
+
+四路导出：
+
+```bash
+python scripts/export_rig_yaml.py \
+  --experiment main_1600x1200_exp01 \
+  --method charuco \
+  --output data/results/four_camera_intrinsics.yaml
+```
+
+导出给 3D Motion：
+
+```bash
+python scripts/export_3dmotion_cameras_yaml.py \
+  --intrinsics data/results/four_camera_intrinsics.yaml \
+  --output ../3DMotion/configs/cameras.yaml \
+  --existing ../3DMotion/configs/cameras.yaml
+```
+
+## 4. 验收重点
+
+- 每路有效图建议 80-150 张，覆盖完整有效成像圆。
+- 初筛 `RMS < 5 px` 优先，`5-10 px` 可诊断，`>10 px` 回查模型、覆盖、角点和图像模式。
+- 不只看 RMS，还要看残差分布、边缘误差、主点、重复标定稳定性。
+- 内参通过后再做多相机外参和 camera-IMU 标定。

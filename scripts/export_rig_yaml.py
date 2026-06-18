@@ -14,15 +14,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Export four_camera_intrinsics.yaml from existing per-camera results.")
     parser.add_argument("--config", default="configs/four_head_rig.yaml")
     parser.add_argument("--results-root", default="data/results")
-    parser.add_argument("--method", default="chessboard")
+    parser.add_argument("--method", default="charuco")
+    parser.add_argument("--experiment", help="Experiment name under each camera directory, e.g. main_1600x1200_exp01.")
     parser.add_argument("--output", default="data/results/four_camera_intrinsics.yaml")
     parser.add_argument("--principal-tolerance-px", type=float, default=20.0)
-    parser.add_argument("--max-rms-px", type=float, default=0.5)
-    parser.add_argument("--max-per-view-px", type=float, default=1.0)
+    parser.add_argument("--max-rms-px", type=float, default=5.0)
+    parser.add_argument("--max-per-view-px", type=float, default=10.0)
     args = parser.parse_args()
 
     rig = load_rig_config(args.config)
-    paths = [Path(args.results_root) / camera.key / args.method / "calibration.yaml" for camera in rig.cameras]
+    if args.experiment:
+        paths = [Path(args.results_root) / camera.key / args.experiment / args.method / "calibration.yaml" for camera in rig.cameras]
+    else:
+        paths = [Path(args.results_root) / camera.key / args.method / "calibration.yaml" for camera in rig.cameras]
     missing = [str(path) for path in paths if not path.exists()]
     if missing:
         raise FileNotFoundError(f"Missing calibration files: {missing}")

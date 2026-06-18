@@ -24,6 +24,7 @@ def make_options(args: argparse.Namespace) -> CalibrationOptions:
         debug_dir=paths["debug_dir"],
         square_size=args.square_size,
         max_error=args.max_error,
+        camera_model=args.camera_model,
         auto_filter=args.auto_filter,
         quality_filter=QualityFilter(
             min_sharpness=args.min_sharpness,
@@ -79,7 +80,13 @@ def main() -> None:
     parser.add_argument("--images-root", default="data/images")
     parser.add_argument("--results-root", default="data/results")
     parser.add_argument("--square-size", type=float, required=True)
-    parser.add_argument("--max-error", type=float, default=1.0)
+    parser.add_argument("--max-error", type=float, default=5.0)
+    parser.add_argument(
+        "--camera-model",
+        choices=["fisheye", "pinhole"],
+        default="fisheye",
+        help="Intrinsic/distortion model. Use fisheye for 1.4mm 220-240 degree lenses.",
+    )
     parser.add_argument("--auto-filter", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--min-sharpness", type=float, default=20.0)
     parser.add_argument("--min-contrast", type=float, default=15.0)
