@@ -107,6 +107,50 @@ std_y  =  0.885830 px
 > 2-3 px      需要检查图像覆盖、板子尺寸、模型或角点质量
 ```
 
+Kalibr 这里给的是 x/y 两个方向的误差标准差。为了得到一个更直观的二维像素误差，
+可以计算：
+
+```text
+rms_2d = sqrt(std_x^2 + std_y^2)
+```
+
+例如：
+
+```text
+std_x = 0.869667 px
+std_y = 0.885830 px
+rms_2d = sqrt(0.869667^2 + 0.885830^2) = 1.241376 px
+```
+
+仓库提供了脚本直接从 Kalibr `*-results-cam.txt` 里计算：
+
+```bash
+python scripts/kalibr_reprojection_rms.py \
+  data/kalibr/main_1600x1200_exp01/left_side-results-cam.txt
+```
+
+输出示例：
+
+```text
+mean_x_px: -0.000022
+mean_y_px:  0.000002
+std_x_px:   0.869667
+std_y_px:   0.885830
+rms_2d_px:  1.241376
+```
+
+对 `ds-none` 的经验参考：
+
+```text
+A4 smoke test:
+  rms_2d < 2 px       链路测试通常可以接受
+
+正式大板:
+  rms_2d < 1.5 px     较好
+  1.5-2.0 px          可诊断，需要结合覆盖和残差图判断
+  > 2.0 px            建议检查采集、板尺寸、模型选择和角点质量
+```
+
 不要只看一个总误差。正式结果还要看：
 
 ```text
