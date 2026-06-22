@@ -28,6 +28,8 @@ def main() -> None:
     }
     write_yaml(args.output, data)
     print(f"wrote {args.output}")
+    print("note: this is the Kalibr target YAML, not printable artwork.")
+    print("next: run scripts/generate_kalibr_aprilgrid_artwork.py, print at 100%, then measure the real tagSize/tagSpacing.")
 
 
 if __name__ == "__main__":

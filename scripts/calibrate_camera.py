@@ -99,10 +99,13 @@ def main() -> None:
     args = parser.parse_args()
 
     options = make_options(args)
-    if args.method == "chessboard":
-        result = calibrate_chessboard(args.cols, args.rows, options)
-    else:
-        result = calibrate_charuco(args.cols, args.rows, args.marker_ratio, options)
+    try:
+        if args.method == "chessboard":
+            result = calibrate_chessboard(args.cols, args.rows, options)
+        else:
+            result = calibrate_charuco(args.cols, args.rows, args.marker_ratio, options)
+    except (FileNotFoundError, RuntimeError) as exc:
+        raise SystemExit(f"error: {exc}") from exc
 
     cm = result["camera_matrix"]
     summary = result["per_view_error_summary"]

@@ -5,3 +5,7 @@ __pycache__/
 data/images/
 data/results/
 data/patterns/
+data/kalibr/
+data/targets/*.png
+data/targets/*.svg
+data/targets/*.pdf

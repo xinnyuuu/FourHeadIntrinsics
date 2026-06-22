@@ -70,6 +70,15 @@ def _prepare_dirs(options: CalibrationOptions) -> None:
     shutil.rmtree(options.processed_dir / "rejected", ignore_errors=True)
 
 
+def _input_images(options: CalibrationOptions) -> list[Path]:
+    if not options.images.exists():
+        raise FileNotFoundError(f"Input image directory does not exist: {options.images}")
+    images = list_images(options.images)
+    if not images:
+        raise FileNotFoundError(f"No calibration images found in {options.images}")
+    return images
+
+
 def _model_metadata(camera_model: str) -> dict[str, str]:
     if camera_model == "fisheye":
         return {
@@ -187,7 +196,7 @@ def calibrate_chessboard(cols: int, rows: int, options: CalibrationOptions) -> d
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 50, 0.001)
     flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_FAST_CHECK
 
-    for path in list_images(options.images):
+    for path in _input_images(options):
         img = cv2.imread(str(path))
         if img is None:
             continue
@@ -357,7 +366,7 @@ def calibrate_charuco(cols: int, rows: int, marker_ratio: float, options: Calibr
     quality_metrics_by_image: dict[str, dict[str, float]] = {}
     image_size: tuple[int, int] | None = None
 
-    for path in list_images(options.images):
+    for path in _input_images(options):
         img = cv2.imread(str(path))
         if img is None:
             continue

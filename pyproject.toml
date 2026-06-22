@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fourhead-intrinsics"
 version = "0.1.0"
-description = "Intrinsic calibration tools for four independent USB cameras on a head-mounted rig."
+description = "Fisheye and omnidirectional calibration helpers for a four-camera head-mounted rig."
 requires-python = ">=3.10"
 dependencies = [
   "opencv-contrib-python>=4.9",
