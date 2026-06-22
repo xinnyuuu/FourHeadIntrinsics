@@ -1,4 +1,4 @@
-# Kalibr 输出和诊断报告说明
+# Kalibr 输出和通过率说明
 
 这份文档解释 FourHeadIntrinsics 流程里常见的输出文件和数字含义。
 
@@ -20,14 +20,14 @@ results-cam.txt    终端结果的文本版，适合快速看参数和误差
 report-cam.pdf     图形报告，适合看重投影误差分布和角点覆盖
 ```
 
-FourHeadIntrinsics 的 AprilGrid 诊断脚本会生成：
+如果使用 `tee` 保存 Kalibr 终端日志，还可以解析真实图像通过率：
 
 ```text
-aprilgrid_detection_report.csv
-debug overlay images
+*-kalibr.log
 ```
 
-它用于判断图片里是否能检测到 AprilTag，以及缺哪些 tag。
+这个通过率来自 Kalibr 自己的 `Processed X images with Y images used` 输出，
+更接近真实标定输入。
 
 ## 2. Double Sphere 模型
 
@@ -186,61 +186,59 @@ omni-radtan:
 
 不同 Kalibr 版本的打印格式可能略有差异，最终以 `camchain.yaml` 里的字段为准。
 
-## 5. AprilGrid 诊断 CSV
+## 5. Kalibr 图像通过率
 
-运行：
+Kalibr 标定结束时，终端会打印类似：
+
+```text
+Processed 30 images with 19 images used
+```
+
+建议运行 Kalibr 时保存日志：
 
 ```bash
-python scripts/diagnose_aprilgrid_images.py \
-  --images data/images/left_front/main_1600x1200_exp01 \
-  --target-yaml data/targets/aprilgrid_6x6_025_a4.yaml \
-  --output-dir data/results/left_front/main_1600x1200_exp01/aprilgrid_debug
+rosrun kalibr kalibr_calibrate_cameras \
+  --bag /data/data/kalibr/main_1600x1200_exp01/left_front.bag \
+  --topics /left_front/image_raw \
+  --models ds-none \
+  --target /data/data/targets/aprilgrid_6x6_025_a4.yaml \
+  --show-extraction \
+  2>&1 | tee /data/data/kalibr/main_1600x1200_exp01/left_front-kalibr.log
 ```
 
-会生成：
+回到宿主机后解析：
+
+```bash
+python scripts/kalibr_pass_rate.py \
+  data/kalibr/main_1600x1200_exp01/left_front-kalibr.log
+```
+
+输出：
 
 ```text
-aprilgrid_detection_report.csv
+total_images: 30
+used_images:  19
+rejected:     11
+pass_rate:    63.33%
 ```
 
-字段含义：
+`used_images` 是 Kalibr 实际加入优化的 target observations。这个数比 OpenCV
+单独检测 AprilTag 的数量更重要。
+
+经验参考：
 
 ```text
-image                图片名
-expected_seen        成功识别出的目标 tag 数
-expected_total       target YAML 期望的 tag 总数
-unexpected_count     识别出了但不在 target 范围内的 tag 数
-rejected_candidates  看起来像 tag、但未能成功解码的候选框数量
-seen_ids             成功识别出的目标 tag id
-missing_ids          期望存在但没识别出的 tag id
-unexpected_ids       不在 target 范围内的 tag id
+A4 smoke test:
+  只要能稳定提取并完成优化即可，不追求高通过率。
+
+正式大板:
+  pass_rate > 70%    通常较健康
+  40-70%             可诊断，检查覆盖、模糊、反光和姿态
+  < 40%              采集或标定板条件通常需要重做
 ```
 
-例如：
-
-```text
-expected_seen=31/36
-rejected_candidates=44
-missing_ids=0 6 12 24 30
-```
-
-表示这张图成功识别了 36 个期望 tag 中的 31 个，另有 44 个疑似 tag 的候选轮廓
-没有解码成功，并且缺了 `0, 6, 12, 24, 30` 这些 tag。
-
-`rejected_candidates` 不是“图片被拒绝”，而是“疑似 tag 候选框没解码成功”。
-它很多时，常见原因是：
-
-```text
-板子太近，鱼眼畸变太强
-图像边缘拉伸严重
-运动模糊、过曝、反光
-打印边缘不够锐
-tag 在图中太小
-背景里有类似黑白块的干扰
-```
-
-这个诊断脚本使用 OpenCV AprilTag 检测器，不等同于 Kalibr 的检测器。OpenCV 能看到
-`36/36` 只说明图里有 tag，不保证 Kalibr 一定能形成 valid grid observation。
+通过率也不能单独决定结果好坏。要和 reprojection RMS、角点覆盖、pose 分布和重复
+标定稳定性一起看。
 
 ## 6. 结果是否可用
 

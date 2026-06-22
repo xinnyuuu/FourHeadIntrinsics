@@ -183,21 +183,18 @@ rosrun kalibr kalibr_calibrate_cameras \
   --topics /left_front/image_raw \
   --models ds-none \
   --target /data/data/targets/aprilgrid_6x6_025_a4.yaml \
-  --show-extraction
+  --show-extraction \
+  2>&1 | tee /data/data/kalibr/main_1600x1200_exp01/left_front-kalibr.log
 ```
 
-如果 Kalibr 报 `No corners could be extracted`，先在宿主机生成诊断图：
+回到宿主机后，用 Kalibr 日志计算真实图像通过率：
 
 ```bash
-python scripts/diagnose_aprilgrid_images.py \
-  --images data/images/left_front/main_1600x1200_exp01 \
-  --target-yaml data/targets/aprilgrid_6x6_025_a4.yaml \
-  --output-dir data/results/left_front/main_1600x1200_exp01/aprilgrid_debug
+python scripts/kalibr_pass_rate.py \
+  data/kalibr/main_1600x1200_exp01/left_front-kalibr.log
 ```
 
-查看 `aprilgrid_detection_report.csv` 和 debug 图片，确认每张图能看到多少个
-expected tag、缺哪些 id。这个诊断使用 OpenCV AprilTag 检测器，不完全等同于
-Kalibr 的检测器，但能快速判断图像、板子和 target YAML 是否明显不匹配。
+输出里的 `used_images / total_images` 是 Kalibr 自己实际接受的 observation 比例。
 
 正式阶段用标准大板重新采 bag，并把 `--target` 换成标准大板 YAML。模型比较顺序：
 
@@ -252,9 +249,23 @@ python scripts/analyze_experiments.py \
   --undistort
 ```
 
+如果使用 Kalibr `ds-none` 结果，可以用 Double Sphere 去畸变预览脚本：
+
+```bash
+python scripts/undistort_kalibr_ds.py \
+  --camchain data/kalibr/main_1600x1200_exp01/left_side-camchain.yaml \
+  --camera cam0 \
+  --images data/images/left_side/main_1600x1200_exp01 \
+  --output-dir data/analysis/left_side/main_1600x1200_exp01/ds_undistort \
+  --limit 8
+```
+
+输出是原图和 rectilinear 预览的 side-by-side 图片。`--rectified-focal-px` 可以调节
+预览视场：数值越小视场越大、黑边和拉伸越明显；数值越大视场越窄。
+
 ## 7. 质量检查
 
-Kalibr 输出数字和 AprilGrid 诊断 CSV 的详细解释见：
+Kalibr 输出数字、真实图像通过率和 RMS 的详细解释见：
 
 [kalibr_report_guide.md](kalibr_report_guide.md)
 

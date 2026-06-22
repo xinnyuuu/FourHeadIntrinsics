@@ -41,7 +41,11 @@ OpenCV `fisheye` + ChArUco 是 fallback，用于先跑通采集/检测/结果检
 
 [docs/fisheye_intrinsics_workflow.md](docs/fisheye_intrinsics_workflow.md)
 
-Kalibr 输出、重投影误差和 AprilGrid 诊断 CSV 的字段解释见：
+没有大幅面打印机时，用 A4 分块打印再拼贴 AprilGrid 的方案见：
+
+[docs/a4_tiled_aprilgrid_plan.md](docs/a4_tiled_aprilgrid_plan.md)
+
+Kalibr 输出、真实图像通过率和重投影误差的字段解释见：
 
 [docs/kalibr_report_guide.md](docs/kalibr_report_guide.md)
 
