@@ -1,6 +1,6 @@
 # Kalibr 输出和通过率说明
 
-这份文档解释 FourHeadIntrinsics 流程里常见的输出文件和数字含义。
+这份文档解释 VimasCalibration 流程里常见的输出文件和数字含义。
 
 ## 1. 常见输出文件
 
@@ -162,7 +162,7 @@ A4 smoke test:
 
 ## 4. 常见模型参数顺序
 
-FourHeadIntrinsics 推荐先比较：
+VimasCalibration 推荐先比较：
 
 ```text
 ds-none -> eucm-none -> omni-radtan

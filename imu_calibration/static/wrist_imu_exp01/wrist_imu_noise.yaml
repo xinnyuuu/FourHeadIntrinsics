@@ -1,0 +1,20 @@
+imus:
+  wrist_imu:
+    accelerometer_noise_density: 4.0045094946585676e-05
+    accelerometer_random_walk: 4.0045094946585676e-06
+    gyroscope_noise_density: 4.231976701234699e-06
+    gyroscope_random_walk: 4.2319767012346987e-07
+    accel_bias_mps2:
+    - 0.16584648762110965
+    - -0.07380141469799834
+    - 9.895526072751867
+    gyro_bias_radps:
+    - -1.4868765391261235e-05
+    - -6.861659880559923e-05
+    - 0.0003177510233614057
+    sample_rate_hz: 4737.8769573354175
+    sample_count: 9672
+    note: First-pass static estimate; replace with Allan variance for production calibration.
+source:
+  jsonl: imu_calibration/static/wrist_imu.jsonl
+  method: static first-pass standard deviation estimate

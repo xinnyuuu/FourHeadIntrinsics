@@ -3,14 +3,19 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fourhead-intrinsics"
+name = "vimas-calibration"
 version = "0.1.0"
-description = "Fisheye and omnidirectional calibration helpers for a four-camera head-mounted rig."
+description = "VIMAS head/wrist camera and IMU calibration toolkit."
 requires-python = ">=3.10"
 dependencies = [
   "opencv-contrib-python>=4.9",
   "numpy>=1.26",
   "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+ble = [
+  "bleak>=0.22",
 ]
 
 [tool.setuptools]

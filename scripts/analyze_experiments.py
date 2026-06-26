@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import cv2
 import numpy as np
 
-from fourhead_intrinsics.io import list_images, load_calibration, write_side_by_side
+from vimas_calibration.io import list_images, load_calibration, write_side_by_side
 
 
 FLOAT_COLUMNS = {

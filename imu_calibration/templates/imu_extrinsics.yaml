@@ -1,0 +1,24 @@
+frames:
+  conventions:
+    wrist_B:
+      origin: wristband geometric center
+      x: toward fingers along the back-of-hand plane
+      y: toward the left side of the hand
+      z: outward normal from the back of the hand
+      handedness: right
+  head:
+    T_H_IH:
+      rotation_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, 0.0]
+  wrist:
+    T_B_IB:
+      rotation_matrix:
+        - [-1.0, 0.0, 0.0]
+        - [0.0, -1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, -0.034]
+      translation_note: "Current measured wrist IMU origin is 34 mm along B -Z from wristband center."
+      rotation_note: "IMU +X = B -X, IMU +Y = B -Y, IMU +Z = B +Z."

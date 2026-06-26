@@ -7,13 +7,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from fourhead_intrinsics.calibration import (
+from vimas_calibration.calibration import (
     CalibrationOptions,
     QualityFilter,
     calibrate_charuco,
     calibrate_chessboard,
 )
-from fourhead_intrinsics.rig import export_four_camera_yaml, load_rig_config
+from vimas_calibration.rig import export_four_camera_yaml, load_rig_config
 
 
 def make_options(

@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import cv2
 import numpy as np
 
-from fourhead_intrinsics.video import CaptureSpec, camera_summary, open_capture
+from vimas_calibration.video import CaptureSpec, camera_summary, open_capture
 
 
 def frame_motion_score(previous_gray: np.ndarray | None, frame: np.ndarray, width: int) -> tuple[float, np.ndarray]:

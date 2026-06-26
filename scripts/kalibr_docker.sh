@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="${KALIBR_IMAGE:-fourhead-kalibr:ros1_20_04}"
+IMAGE="${KALIBR_IMAGE:-vimas-kalibr:ros1_20_04}"
 REPO="${KALIBR_REPO:-https://github.com/ethz-asl/kalibr.git}"
 WORKDIR_HOST="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_UID="$(id -u)"

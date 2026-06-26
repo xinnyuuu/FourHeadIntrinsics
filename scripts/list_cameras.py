@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from fourhead_intrinsics.video import list_available_cameras
+from vimas_calibration.video import list_available_cameras
 
 
 def main() -> None:

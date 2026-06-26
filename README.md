@@ -1,8 +1,14 @@
-# FourHeadIntrinsics
+# VimasCalibration
 
-四目头环鱼眼/全向相机标定辅助仓库。这个仓库只负责生成标定板、采集标定数据、
-求单路/多路相机内参和外参，并把结果保存为本仓库自己的 YAML。下游工程如何消费
-这些参数，不放在 FourHeadIntrinsics 里维护。
+VIMAS 头环/手环 camera + IMU 标定工具包。这个仓库分成三块：
+
+- `camera_intrinsics/`：相机内参、畸变、Kalibr/OpenCV 流程说明。
+- `camera_extrinsics/`：相机相对头环 Head frame 的外参定义、模板和测量流程说明。
+- `imu_calibration/`：Head IMU、Wrist IMU 外参和 noise/bias 初步统计流程。
+
+VimasCalibration 是独立标定仓库：它负责采集、估计和导出标定结果；下游工程
+例如 3DMotion 只消费自己仓库内的配置文件。跨仓库交接时应人工审阅坐标系、单位和
+transform 方向，不在本仓库维护“一键写入 3DMotion”的脚本。
 
 当前物理顺序：
 
@@ -15,7 +21,7 @@ left_side -> left_front -> right_front -> right_side
 ## 环境
 
 ```bash
-cd ~/lxy/FourHeadIntrinsics
+cd ~/lxy/VimasCalibration
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -36,10 +42,38 @@ OpenCV `fisheye` + ChArUco 是 fallback，用于先跑通采集/检测/结果检
 
 ## 工作流程
 
-单个鱼眼相机内参、A4 测试板、正式大板、Kalibr Docker、OpenCV fallback 和质量检查
-都统一维护在：
+相机内参流程：
 
 [docs/fisheye_intrinsics_workflow.md](docs/fisheye_intrinsics_workflow.md)
+
+相机到 Head frame 的外参流程：
+
+[camera_extrinsics/README.md](camera_extrinsics/README.md)
+
+Head/Wrist IMU 标定流程：
+
+[imu_calibration/README.md](imu_calibration/README.md)
+
+## 输出成果物
+
+标定完成后，重点保留这些 YAML：
+
+```text
+data/results/four_camera_intrinsics.yaml             # 四目内参汇总
+camera_extrinsics/four_head_camera_extrinsics.yaml  # T_head_camera / T_H_C 候选
+imu_calibration/imu_extrinsics.yaml                  # T_H_IH / T_B_IB
+imu_calibration/static/*/*_noise.yaml                # head_imu / wrist_imu noise and bias
+imu_calibration/kalibr_head_imu.yaml                 # Kalibr camera-IMU 标定用 imu.yaml
+```
+
+交给 3DMotion 前，人工确认：
+
+```text
+transform direction: T_A_B maps B-frame points into A-frame
+translation unit: meters
+camera order: left_side -> left_front -> right_front -> right_side
+IMU units: m/s^2 and rad/s
+```
 
 没有大幅面打印机时，用 A4 分块打印再拼贴 AprilGrid 的方案见：
 

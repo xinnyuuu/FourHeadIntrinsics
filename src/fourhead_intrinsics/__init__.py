@@ -1,3 +1,3 @@
-"""Four-camera head-ring intrinsic calibration utilities."""
+"""Backward-compatible import shim for vimas_calibration."""
 
 __version__ = "0.1.0"

@@ -10,3 +10,4 @@ data/kalibr/
 data/targets/*.png
 data/targets/*.svg
 data/targets/*.pdf
+imu_calibration/static/**/*.jsonl

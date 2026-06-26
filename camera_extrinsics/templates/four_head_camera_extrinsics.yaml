@@ -1,0 +1,57 @@
+# Template for camera-to-head extrinsics.
+#
+# Convention:
+#   T_head_camera maps a 3D point from camera frame C into headset Head frame H:
+#     p_H = R_H_C * p_C + t_H_C
+#
+# Recommended Head frame:
+#   origin: center of the rigid four-camera headset cluster
+#   +X: forward
+#   +Y: left
+#   +Z: up
+#
+# Fill these values from CAD, mechanical measurement, multi-camera calibration,
+# mocap, or an AprilTag/calibration fixture.
+
+head_frame:
+  name: head
+  origin: "TODO: e.g. midpoint between left_front and right_front optical centers"
+  axes:
+    x: forward
+    y: left
+    z: up
+  units: meters
+
+cameras:
+  left_side:
+    role: cam_left_side
+    T_head_camera:
+      rotation_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, 0.0]
+  left_front:
+    role: cam_left_front
+    T_head_camera:
+      rotation_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, 0.0]
+  right_front:
+    role: cam_right_front
+    T_head_camera:
+      rotation_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, 0.0]
+  right_side:
+    role: cam_right_side
+    T_head_camera:
+      rotation_matrix:
+        - [1.0, 0.0, 0.0]
+        - [0.0, 1.0, 0.0]
+        - [0.0, 0.0, 1.0]
+      translation_m: [0.0, 0.0, 0.0]
