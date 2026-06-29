@@ -8,7 +8,7 @@ This folder is the entry point for camera intrinsics work:
 - Kalibr and OpenCV fallback workflows
 
 The current implementation keeps executable scripts in `../scripts` and reusable Python code in
-`../src/vimas_calibration`. The old `fourhead_intrinsics` package remains as a compatibility shim.
+`../src/vimas_calibration`.
 
 Main references:
 

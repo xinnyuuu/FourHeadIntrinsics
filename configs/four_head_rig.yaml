@@ -9,11 +9,11 @@ cameras:
   - key: left_side
     label: 左侧
     role: cam_left_side
-    source: /dev/video0
+    source: /dev/video2
   - key: left_front
     label: 左前
     role: cam_left_front
-    source: /dev/video2
+    source: /dev/video0
   - key: right_front
     label: 右前
     role: cam_right_front

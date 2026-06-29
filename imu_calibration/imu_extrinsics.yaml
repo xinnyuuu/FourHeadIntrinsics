@@ -9,12 +9,12 @@ frames:
   head:
     T_H_IH:
       rotation_matrix:
-        - [1.0, 0.0, 0.0]
-        - [0.0, 1.0, 0.0]
         - [0.0, 0.0, 1.0]
-      translation_m: [0.0, 0.0, 0.0]
-      status: placeholder
-      note: "P3a may temporarily use H := I_H before this extrinsic is measured."
+        - [0.0, 1.0, 0.0]
+        - [-1.0, 0.0, 0.0]
+      translation_m: [0.112, 0.0, 0.0]
+      status: measured_from_axes_and_translation
+      note: "IMU +X = H -Z, IMU +Y = H +Y, IMU +Z = H +X. Head IMU origin is measured 112 mm along H +X from H origin; Y/Z translation unchanged."
   wrist:
     T_B_IB:
       rotation_matrix:

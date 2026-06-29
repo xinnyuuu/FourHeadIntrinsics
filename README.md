@@ -75,9 +75,9 @@ camera order: left_side -> left_front -> right_front -> right_side
 IMU units: m/s^2 and rad/s
 ```
 
-没有大幅面打印机时，用 A4 分块打印再拼贴 AprilGrid 的方案见：
+没有大幅面打印机时，先用 A4 AprilGrid 跑通链路的方案见：
 
-[docs/a4_tiled_aprilgrid_plan.md](docs/a4_tiled_aprilgrid_plan.md)
+[docs/fisheye_intrinsics_workflow.md](docs/fisheye_intrinsics_workflow.md)
 
 Kalibr 输出、真实图像通过率和重投影误差的字段解释见：
 
@@ -131,6 +131,6 @@ python scripts/export_rig_yaml.py \
 ## 维护检查
 
 ```bash
-python -m py_compile $(rg --files scripts src -g '*.py')
-for f in scripts/*.py; do python "$f" --help >/tmp/help.out || exit 1; done
+PYTHONPATH=src python -m py_compile $(rg --files scripts src -g '*.py')
+for f in scripts/*.py; do PYTHONPATH=src python "$f" --help >/tmp/help.out || exit 1; done
 ```

@@ -31,6 +31,25 @@ You can define this from CAD, a mechanical drawing, or careful physical measurem
 rule is consistency: every camera translation and rotation must be expressed relative to the same
 Head frame.
 
+Current measured Head frame origin for this prototype:
+
+```text
+H origin: user-measured headset center point
++X: forward toward the headset front
++Y: user's left
++Z: up
+
+Measured headset width, left-right outer edge to outer edge: 0.176 m
+H origin is the left-right midpoint: 0.088 m from either side edge
+
+Measured distance from H origin to the frontmost outer edge: 0.107 m
+With +X forward, the frontmost outer edge is at x = +0.107 m relative to H
+
+Measured headset vertical thickness: 0.034 m
+H origin is the vertical midpoint: 0.017 m from top and bottom outer edges
+With +Z up, the top outer edge is at z = +0.017 m and the bottom outer edge is at z = -0.017 m
+```
+
 ## 2. If You Measure Camera Pose Directly in Head Frame
 
 If CAD or measurement gives camera axes and camera optical center directly in Head frame, write them
@@ -103,55 +122,16 @@ Template:
 
 - `templates/four_head_camera_extrinsics.yaml`
 
-## 6. Kalibr Multi-Camera Workflow
+## 6. Three-Segment Four-Camera Workflow
 
-Use this path when adjacent headset cameras can see the same AprilGrid at the same time.
-
-### Capture
-
-Use the same capture mode as intrinsics, for example `1600x1200 MJPG 25fps`. Capture synchronized
-image sequences into:
+Use this as the main four-camera extrinsics path. The goal is one connected Kalibr chain:
 
 ```text
-data/images/left_side/<experiment>/
-data/images/left_front/<experiment>/
-data/images/right_front/<experiment>/
-data/images/right_side/<experiment>/
+left_side -- left_front -- right_front -- right_side
 ```
 
-Move the AprilGrid through the overlapping regions:
-
-```text
-left_side + left_front
-left_front + right_front
-right_front + right_side
-```
-
-Keep many frames where each neighboring pair sees the board together. Kalibr needs these shared
-observations to estimate camera-to-camera transforms.
-
-### Build a Multi-Camera ROS Bag
-
-Inside the Kalibr container:
-
-```bash
-python3 /data/scripts/images_to_multicam_rosbag.py \
-  --config /data/configs/four_head_rig.yaml \
-  --images-root /data/data/images \
-  --experiment extrinsics_1600x1200_exp01 \
-  --output /data/data/kalibr/extrinsics_1600x1200_exp01/four_head.bag
-```
-
-This writes four topics:
-
-```text
-/left_side/image_raw
-/left_front/image_raw
-/right_front/image_raw
-/right_side/image_raw
-```
-
-The topic order must match `configs/four_head_rig.yaml`. Kalibr names cameras by topic order:
+Kalibr names cameras by topic order, so the order in `configs/four_head_rig.yaml` is part of the
+calibration result:
 
 ```text
 cam0 = left_side
@@ -160,80 +140,243 @@ cam2 = right_front
 cam3 = right_side
 ```
 
-### Run Kalibr
-
-Use the model that won your intrinsics comparison. Example with `omni-radtan`:
+Before capture, verify that the config matches the current physical `/dev/video*` mapping:
 
 ```bash
+python scripts/list_cameras.py --max-index 8 --require-frame
+cat configs/four_head_rig.yaml
+```
+
+Current config:
+
+```text
+left_side   -> /dev/video2
+left_front  -> /dev/video0
+right_front -> /dev/video6
+right_side  -> /dev/video4
+```
+
+### 6.1 Capture Three Segments
+
+Set one experiment id and capture the three neighboring overlaps. Press `SPACE` to save one
+synchronized four-camera set.
+
+```bash
+EXP=exp03
+
+python scripts/capture_multicam_extrinsics.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_ls_lf_${EXP} \
+  --max-sets 80
+
+python scripts/capture_multicam_extrinsics.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_lf_rf_${EXP} \
+  --max-sets 80
+
+python scripts/capture_multicam_extrinsics.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_rf_rs_${EXP} \
+  --max-sets 80
+```
+
+For each segment, keep the AprilGrid visible in the intended pair:
+
+```text
+extrinsics_ls_lf_*: left_side + left_front
+extrinsics_lf_rf_*: left_front + right_front
+extrinsics_rf_rs_*: right_front + right_side
+```
+
+After capture, check the folders and image counts:
+
+```bash
+python scripts/check_multicam_capture.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_ls_lf_${EXP} \
+  --require-equal-counts
+
+python scripts/check_multicam_capture.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_lf_rf_${EXP} \
+  --require-equal-counts
+
+python scripts/check_multicam_capture.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_rf_rs_${EXP} \
+  --require-equal-counts
+```
+
+### 6.2 Build Pair-Only Selection Files
+
+These JSON files only choose which camera topics are present in each segment of the sparse bag.
+They are not the final AprilGrid detection result; Kalibr still extracts the target from the real
+images.
+
+```bash
+OUT=data/kalibr/extrinsics_three_segment_${EXP}
+mkdir -p ${OUT}
+
+python scripts/select_multicam_aprilgrid_observations.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_ls_lf_${EXP} \
+  --output ${OUT}/ls_lf_selection.json \
+  --allowed-cameras left_side left_front \
+  --force-include-cameras left_side left_front \
+  --required-pairs left_side+left_front \
+  --min-tags 999
+
+python scripts/select_multicam_aprilgrid_observations.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_lf_rf_${EXP} \
+  --output ${OUT}/lf_rf_selection.json \
+  --allowed-cameras left_front right_front \
+  --force-include-cameras left_front right_front \
+  --required-pairs left_front+right_front \
+  --min-tags 999
+
+python scripts/select_multicam_aprilgrid_observations.py \
+  --config configs/four_head_rig.yaml \
+  --experiment extrinsics_rf_rs_${EXP} \
+  --output ${OUT}/rf_rs_selection.json \
+  --allowed-cameras right_front right_side \
+  --force-include-cameras right_front right_side \
+  --required-pairs right_front+right_side \
+  --min-tags 999
+```
+
+For example, with `EXP=exp03`, the three output files are:
+
+```text
+data/kalibr/extrinsics_three_segment_exp03/ls_lf_selection.json
+data/kalibr/extrinsics_three_segment_exp03/lf_rf_selection.json
+data/kalibr/extrinsics_three_segment_exp03/rf_rs_selection.json
+```
+
+### 6.3 Merge The Sparse Bag
+
+Start the Kalibr container:
+
+```bash
+chmod +x scripts/kalibr_docker.sh
+scripts/kalibr_docker.sh build
+scripts/kalibr_docker.sh shell
+```
+
+Inside the container:
+
+```bash
+EXP=exp03
+OUT=/data/data/kalibr/extrinsics_three_segment_${EXP}
+mkdir -p ${OUT}
+
+python3 /data/scripts/merge_multicam_experiments_to_rosbag.py \
+  --config /data/configs/four_head_rig.yaml \
+  --images-root /data/data/images \
+  --experiment extrinsics_ls_lf_${EXP}:${OUT}/ls_lf_selection.json \
+  --experiment extrinsics_lf_rf_${EXP}:${OUT}/lf_rf_selection.json \
+  --experiment extrinsics_rf_rs_${EXP}:${OUT}/rf_rs_selection.json \
+  --output ${OUT}/four_head_sparse.bag
+```
+
+The bag should contain four topics:
+
+```text
+/left_side/image_raw
+/left_front/image_raw
+/right_front/image_raw
+/right_side/image_raw
+```
+
+### 6.4 Run Kalibr
+
+Use the model that won the intrinsics comparison. Example with `omni-radtan`:
+
+```bash
+cd ${OUT}
+
 rosrun kalibr kalibr_calibrate_cameras \
-  --bag /data/data/kalibr/extrinsics_1600x1200_exp01/four_head.bag \
+  --bag four_head_sparse.bag \
   --topics /left_side/image_raw /left_front/image_raw /right_front/image_raw /right_side/image_raw \
   --models omni-radtan omni-radtan omni-radtan omni-radtan \
-  --target /data/data/targets/aprilgrid_6x6_088.yaml \
+  --target /data/data/targets/aprilgrid_6x6_025_a4.yaml \
   --show-extraction \
-  2>&1 | tee /data/data/kalibr/extrinsics_1600x1200_exp01/four_head-kalibr.log
+  2>&1 | tee four_head_sparse-kalibr.log
 ```
 
-Kalibr should output a `*-camchain.yaml`. For multi-camera results, `cam1`, `cam2`, etc. should
-contain `T_cn_cnm1`.
-
-### Export `T_head_camera`
-
-If you only need relative camera extrinsics first, use cam0 as the temporary Head frame:
+If `omni-radtan` fails during automatic intrinsic initialization, use the single-camera Kalibr
+camchains as initial values and keep the same model:
 
 ```bash
-python scripts/export_kalibr_extrinsics.py \
+python3 /data/scripts/kalibr_calibrate_cameras_with_init.py \
+  --init-camchain /left_side/image_raw=/data/data/kalibr/main_1600x1200_exp03/left_side-camchain.yaml \
+  --init-camchain /left_front/image_raw=/data/data/kalibr/leftfront_exp03/left_front-camchain.yaml \
+  --init-camchain /right_front/image_raw=/data/data/kalibr/rightfront_exp03/right_front-camchain.yaml \
+  --init-camchain /right_side/image_raw=/data/data/kalibr/rightside_exp03/right_side-camchain.yaml \
+  --bag four_head_sparse.bag \
+  --topics /left_side/image_raw /left_front/image_raw /right_front/image_raw /right_side/image_raw \
+  --models omni-radtan omni-radtan omni-radtan omni-radtan \
+  --target /data/data/targets/aprilgrid_6x6_025_a4.yaml \
+  --dont-show-report \
+  2>&1 | tee four_head_sparse_omni_init-camchain-kalibr.log
+```
+
+Kalibr should output a `*-camchain.yaml`. For multi-camera results, `cam1`, `cam2`, and `cam3`
+should contain `T_cn_cnm1`.
+
+### 6.5 Align To Head Frame
+
+Back on the host, align Kalibr's relative rig into the measured Head frame using:
+
+```text
+camera_extrinsics/manual_camera_centers.yaml
+```
+
+Current reference camera centers:
+
+```text
+left_side:   [0.042,  0.142, -0.010] m
+left_front:  [0.140,  0.072, -0.026] m
+right_front: [0.138, -0.072, -0.026] m
+right_side:  [0.042, -0.142, -0.010] m
+```
+
+```bash
+EXP=exp03
+
+python scripts/align_kalibr_rig_to_head.py \
   --config configs/four_head_rig.yaml \
-  --camchain data/kalibr/extrinsics_1600x1200_exp01/four_head-camchain.yaml \
+  --camchain data/kalibr/extrinsics_three_segment_${EXP}/four_head_sparse-camchain.yaml \
+  --manual-centers camera_extrinsics/manual_camera_centers.yaml \
   --output camera_extrinsics/four_head_camera_extrinsics.yaml
 ```
 
-This assumes:
+Review:
 
 ```text
-T_head_camera0 = identity
+alignment.rms_residual_m
+alignment.max_residual_m
+cameras.*.T_head_camera
 ```
 
-If you have measured the real Head frame relative to `cam0`, create a YAML:
+Large residuals usually mean camera order, `/dev/video*` mapping, or one of the hand-measured
+camera-center signs is wrong.
 
-```yaml
-T_head_camera:
-  rotation_matrix:
-    - [1.0, 0.0, 0.0]
-    - [0.0, 1.0, 0.0]
-    - [0.0, 0.0, 1.0]
-  translation_m: [0.0, 0.0, 0.0]
-```
+### 6.6 Export For 3DMotion
 
-Then export:
+Generate a paste-in snippet without modifying the downstream repository:
 
 ```bash
-python scripts/export_kalibr_extrinsics.py \
-  --config configs/four_head_rig.yaml \
-  --camchain data/kalibr/extrinsics_1600x1200_exp01/four_head-camchain.yaml \
-  --t-head-cam0 camera_extrinsics/T_head_cam0.yaml \
-  --output camera_extrinsics/four_head_camera_extrinsics.yaml
+python scripts/export_3dmotion_camera_extrinsics.py \
+  --extrinsics camera_extrinsics/four_head_camera_extrinsics.yaml \
+  --output camera_extrinsics/3dmotion_T_H_C_snippet.yaml
 ```
 
-The exporter uses Kalibr's convention:
+Then copy each `T_H_C` into `3DMotion/configs/cameras.yaml` after checking the camera ids:
 
 ```text
-camN.T_cn_cnm1 maps points from cam(N-1) frame into camN frame.
+left_side   -> C0
+left_front  -> C1
+right_front -> C2
+right_side  -> C3
 ```
-
-So the chain is inverted internally before writing `T_head_camera`.
-
-### Downstream handoff
-
-After reviewing the result, copy each camera's `T_head_camera` into the downstream project using its
-local naming convention. For 3DMotion, this value is `T_H_C` in `configs/cameras.yaml`.
-
-Do not copy blindly:
-
-```text
-cam0 = first Kalibr topic
-cam1 = second Kalibr topic
-...
-```
-
-The Kalibr topic order must match the camera order documented in `configs/four_head_rig.yaml`.

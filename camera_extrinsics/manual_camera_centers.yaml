@@ -1,0 +1,31 @@
+# Hand-measured camera center references in Head frame H.
+#
+# Convention:
+#   H +X: forward toward headset front
+#   H +Y: user's left
+#   H +Z: up
+# Units: meters
+#
+# These are reference points for aligning the Kalibr multi-camera rig into H.
+# They are not final T_H_C extrinsics by themselves because camera rotations
+# and Kalibr relative camera transforms are still required.
+
+camera_centers_H:
+  left_side:
+    translation_m: [0.042, 0.142, -0.010]
+    measurement_source: hand_measured_lens_or_module_center
+  left_front:
+    translation_m: [0.140, 0.072, -0.026]
+    measurement_source: hand_measured_lens_or_module_center
+  right_front:
+    translation_m: [0.138, -0.072, -0.026]
+    measurement_source: hand_measured_lens_or_module_center
+  right_side:
+    translation_m: [0.042, -0.142, -0.010]
+    measurement_source: hand_measured_lens_or_module_center
+
+notes:
+  - "Four hand-measured camera centers can align the Kalibr multi-camera rig into H with a least-squares rigid fit."
+  - "Use Kalibr for camera-to-camera rotations and translations; use these measured centers only to place the whole rig in the user-defined Head frame."
+  - "Video mapping: /dev/video2=left_side, /dev/video0=left_front, /dev/video6=right_front, /dev/video4=right_side."
+  - "2026-06-29 update: left_front and right_front were re-measured after adjustment; left_side and right_side are unchanged."

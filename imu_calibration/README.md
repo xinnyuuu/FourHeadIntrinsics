@@ -36,6 +36,25 @@ If OpenVINS needs `T_imu_cam`:
 T_IH_C0 = inverse(T_H_IH) * T_H_C0
 ```
 
+Current measured Head IMU extrinsic:
+
+```text
+t_H_IH = [0.112, 0.0, 0.0] m
+
+IMU +X = H -Z
+IMU +Y = H +Y
+IMU +Z = H +X
+```
+
+So:
+
+```text
+R_H_IH =
+[[ 0, 0, 1],
+ [ 0, 1, 0],
+ [-1, 0, 0]]
+```
+
 ### Head Camera-IMU Kalibr Workflow
 
 Use this when the head IMU is rigidly fixed to the headset camera rig.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -15,16 +16,38 @@ def list_images(folder: Path) -> list[Path]:
     return sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_EXTS)
 
 
+def load_selection(path: str | None) -> dict[int, dict[str, bool]]:
+    if path is None:
+        return {}
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    frames = data.get("frames") or []
+    selection: dict[int, dict[str, bool]] = {}
+    for frame in frames:
+        selection[int(frame["index"])] = {str(key): bool(value) for key, value in (frame.get("include") or {}).items()}
+    return selection
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Convert synchronized multi-camera image folders to one ROS1 bag for Kalibr.")
     parser.add_argument("--config", default="configs/four_head_rig.yaml")
     parser.add_argument("--images-root", default="data/images", help="Contains one subfolder per camera key.")
     parser.add_argument("--experiment", required=True, help="Experiment folder under each camera directory.")
     parser.add_argument("--output", required=True, help="Output ROS1 bag path.")
+    parser.add_argument(
+        "--cameras",
+        nargs="+",
+        default=None,
+        help="Optional camera keys to include, in topic order. Defaults to all cameras from config.",
+    )
     parser.add_argument("--fps", type=float, default=None, help="Defaults to capture.fps from config.")
     parser.add_argument("--topic-suffix", default="/image_raw", help="Topic suffix appended to /<camera_key>.")
     parser.add_argument("--truncate", action="store_true", help="Use the shortest camera sequence if counts differ.")
     parser.add_argument("--max-frames", type=int, default=None)
+    parser.add_argument(
+        "--selection-json",
+        default=None,
+        help="Optional output from select_multicam_aprilgrid_observations.py. Images marked false are omitted from the bag.",
+    )
     args = parser.parse_args()
 
     import cv2
@@ -39,7 +62,15 @@ def main() -> None:
 
     images_root = Path(args.images_root)
     camera_images: list[tuple[str, str, list[Path]]] = []
-    for camera in rig.cameras:
+    selected_cameras = rig.cameras
+    if args.cameras:
+        by_key = {camera.key: camera for camera in rig.cameras}
+        missing = [key for key in args.cameras if key not in by_key]
+        if missing:
+            raise SystemExit(f"error: unknown camera keys in --cameras: {', '.join(missing)}")
+        selected_cameras = [by_key[key] for key in args.cameras]
+
+    for camera in selected_cameras:
         folder = images_root / camera.key / args.experiment
         images = list_images(folder)
         if not images:
@@ -56,15 +87,19 @@ def main() -> None:
         frame_count = min(frame_count, args.max_frames)
     if frame_count <= 0:
         raise SystemExit("error: no frames to write")
+    selection = load_selection(args.selection_json)
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     dt = 1.0 / fps
+    written_counts = {camera_key: 0 for camera_key, _, _ in camera_images}
 
     with rosbag.Bag(str(out), "w") as bag:
         for index in range(frame_count):
             stamp = rospy.Time.from_sec(index * dt)
             for camera_key, topic, images in camera_images:
+                if selection and not selection.get(index, {}).get(camera_key, False):
+                    continue
                 path = images[index]
                 img = cv2.imread(str(path), cv2.IMREAD_COLOR)
                 if img is None:
@@ -78,12 +113,15 @@ def main() -> None:
                 msg.step = int(img.strides[0])
                 msg.data = img.tobytes()
                 bag.write(topic, msg, stamp)
+                written_counts[camera_key] += 1
 
     print(f"wrote {out}")
     print(f"frames_per_camera: {frame_count}")
     print(f"fps: {fps}")
+    if selection:
+        print(f"selection_json: {args.selection_json}")
     for camera_key, topic, images in camera_images:
-        print(f"{camera_key}: topic={topic} images={len(images)}")
+        print(f"{camera_key}: topic={topic} images={len(images)} written={written_counts[camera_key]}")
 
 
 if __name__ == "__main__":
